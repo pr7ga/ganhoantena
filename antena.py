@@ -5,10 +5,11 @@ import matplotlib.pyplot as plt
 from io import StringIO
 
 st.set_page_config(page_title="Ganho da Antena sob Teste", layout="centered")
-st.title("📡 Cálculo do Ganho da Antena sob Teste")
+st.title("📡 Cálculo do Ganho")
 st.markdown("Baseado nos coeficientes de transmissão medidos entre antenas padrão e a antena sob teste.")
 
-# Entrada do usuário
+# Entradas do usuário
+aut_nome = st.text_input("📝 Nome da Antena sob Teste", value="Antena sob Teste")
 fc_input = st.number_input("🔧 Frequência central (MHz)", min_value=0.0, value=1420.0, step=0.1)
 gain_ref_input = st.number_input("📈 Ganho da antena padrão (dBi)", value=8.0, step=0.1)
 
@@ -49,7 +50,11 @@ if uploaded_aut_ref and uploaded_ref_ref:
         s21_ref_ref_fc = np.interp(fc_input, df_ref_ref["Freq_MHz"], df_ref_ref["S21_dB"])
         gain_aut_fc = gain_ref_input + (s21_aut_ref_fc - s21_ref_ref_fc)
 
-        st.success(f"Ganho da antena sob teste em {fc_input:.1f} MHz: **{gain_aut_fc:.2f} dBi**")
+        # Resultado com destaque
+        st.markdown(
+            f"<h2 style='text-align: center; color: green;'>📈 Ganho da {aut_nome} em {fc_input:.1f} MHz: <strong>{gain_aut_fc:.2f} dBi</strong></h2>",
+            unsafe_allow_html=True
+        )
 
         # Gráfico dos S21
         st.subheader("Visualização dos S21")
@@ -59,19 +64,19 @@ if uploaded_aut_ref and uploaded_ref_ref:
         ax1.axvline(fc_input, color='red', linestyle='--', label=f"Frequência Central: {fc_input} MHz")
         ax1.set_xlabel("Frequência (MHz)")
         ax1.set_ylabel("S21 (dB)")
-        ax1.set_title("Coeficiente de Transmissão S21")
+        ax1.set_title(f"Coeficiente de Transmissão S21 ({aut_nome})")
         ax1.legend()
         ax1.grid(True)
         st.pyplot(fig1)
 
         # Gráfico do ganho da antena sob teste
-        st.subheader("📊 Ganho da Antena sob Teste vs Frequência")
+        st.subheader(f"📊 Ganho da {aut_nome} vs Frequência")
         fig2, ax2 = plt.subplots()
-        ax2.plot(freqs_common, gain_aut_freq, label="Ganho da AUT", color='purple')
+        ax2.plot(freqs_common, gain_aut_freq, label=f"Ganho da {aut_nome}", color='purple')
         ax2.axvline(fc_input, color='red', linestyle='--', label=f"{fc_input} MHz")
         ax2.set_xlabel("Frequência (MHz)")
         ax2.set_ylabel("Ganho (dBi)")
-        ax2.set_title("Ganho da Antena sob Teste")
+        ax2.set_title(f"Ganho da {aut_nome} em função da frequência")
         ax2.legend()
         ax2.grid(True)
         st.pyplot(fig2)
