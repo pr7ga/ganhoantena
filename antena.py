@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from io import StringIO
 
 st.set_page_config(page_title="Ganho da Antena sob Teste", layout="centered")
 st.title("📡 Cálculo do Ganho")
@@ -27,30 +26,54 @@ with col4:
     st.markdown("<div style='height: 32px;'>🌐 Idioma</div>", unsafe_allow_html=True)
     idioma = st.selectbox("", ["Português", "English"])
 
-# Função para carregar e tratar os dados dos arquivos CSV
-def carregar_csv_formatado(uploaded_file):
-    df = pd.read_csv(uploaded_file, skiprows=3, names=["Freq_Hz", "S21_dB", "Unused"])
-    df["Freq_Hz"] = df["Freq_Hz"].astype(str).str.replace('+', '', regex=False).str.strip()
-    df["S21_dB"] = df["S21_dB"].astype(str).str.replace('+', '', regex=False).str.strip()
-    df["Freq_Hz"] = df["Freq_Hz"].astype(float)
-    df["S21_dB"] = df["S21_dB"].astype(float)
-    df["Freq_MHz"] = df["Freq_Hz"] / 1e6
-    return df[["Freq_MHz", "S21_dB"]]
 
-# Upload dos arquivos
-uploaded_aut_ref = st.file_uploader("📁 CSV com S21 entre padrão e antena sob teste", type="csv")
-uploaded_ref_ref = st.file_uploader("📁 CSV com S21 entre duas antenas padrão", type="csv")
+# 🔹 Função unificada para CSV ou RESULT
+def carregar_dados(uploaded_file):
+    nome_arquivo = uploaded_file.name.lower()
+    
+    if nome_arquivo.endswith(".csv"):
+        # Arquivo CSV do VNA
+        df = pd.read_csv(uploaded_file, skiprows=3, names=["Freq_Hz", "S21_dB", "Unused"])
+        df["Freq_Hz"] = df["Freq_Hz"].astype(str).str.replace('+', '', regex=False).str.strip()
+        df["S21_dB"] = df["S21_dB"].astype(str).str.replace('+', '', regex=False).str.strip()
+        df["Freq_Hz"] = df["Freq_Hz"].astype(float)
+        df["S21_dB"] = df["S21_dB"].astype(float)
+        df["Freq_MHz"] = df["Freq_Hz"] / 1e6
+        df = df[["Freq_MHz", "S21_dB"]]
+        df = df.rename(columns={"S21_dB": "Amplitude_dB"})
+    
+    elif nome_arquivo.endswith(".result"):
+        # Arquivo .result (7 colunas fixas)
+        df = pd.read_csv(
+            uploaded_file,
+            delim_whitespace=True,
+            header=None,
+            names=["Freq_Hz", "Unused", "Amplitude_dB", "Azim", "Pol", "Elev", "Timestamp"]
+        )
+        df = df[["Freq_Hz", "Amplitude_dB"]].copy()
+        df["Freq_MHz"] = df["Freq_Hz"] / 1e6
+        df = df[["Freq_MHz", "Amplitude_dB"]]
+    
+    else:
+        raise ValueError("Formato de arquivo não suportado. Use .csv ou .result")
+    
+    return df
+
+
+# Upload dos arquivos (aceita CSV e RESULT)
+uploaded_aut_ref = st.file_uploader("📁 Arquivo (.csv ou .result) com S21 entre padrão e antena sob teste", type=["csv", "result"])
+uploaded_ref_ref = st.file_uploader("📁 Arquivo (.csv ou .result) com S21 entre duas antenas padrão", type=["csv", "result"])
 
 if uploaded_aut_ref and uploaded_ref_ref:
     try:
         # Carregar arquivos
-        df_aut_ref = carregar_csv_formatado(uploaded_aut_ref)
-        df_ref_ref = carregar_csv_formatado(uploaded_ref_ref)
+        df_aut_ref = carregar_dados(uploaded_aut_ref)
+        df_ref_ref = carregar_dados(uploaded_ref_ref)
 
         # Interpolação para a mesma base de frequências
         freqs_common = df_aut_ref["Freq_MHz"]
-        s21_aut_ref_interp = np.interp(freqs_common, df_aut_ref["Freq_MHz"], df_aut_ref["S21_dB"])
-        s21_ref_ref_interp = np.interp(freqs_common, df_ref_ref["Freq_MHz"], df_ref_ref["S21_dB"])
+        s21_aut_ref_interp = np.interp(freqs_common, df_aut_ref["Freq_MHz"], df_aut_ref["Amplitude_dB"])
+        s21_ref_ref_interp = np.interp(freqs_common, df_ref_ref["Freq_MHz"], df_ref_ref["Amplitude_dB"])
 
         # Cálculo do ganho da antena sob teste ao longo da faixa
         gain_aut_freq = gain_ref_input + (s21_aut_ref_interp - s21_ref_ref_interp)
@@ -60,11 +83,12 @@ if uploaded_aut_ref and uploaded_ref_ref:
         })
 
         # Ganho na frequência central
-        s21_aut_ref_fc = np.interp(fc_input, df_aut_ref["Freq_MHz"], df_aut_ref["S21_dB"])
-        s21_ref_ref_fc = np.interp(fc_input, df_ref_ref["Freq_MHz"], df_ref_ref["S21_dB"])
+        s21_aut_ref_fc = np.interp(fc_input, df_aut_ref["Freq_MHz"], df_aut_ref["Amplitude_dB"])
+        s21_ref_ref_fc = np.interp(fc_input, df_ref_ref["Freq_MHz"], df_ref_ref["Amplitude_dB"])
         gain_aut_fc = gain_ref_input + (s21_aut_ref_fc - s21_ref_ref_fc)
 
         st.markdown("<hr>", unsafe_allow_html=True)
+
         # Equação explicativa
         if idioma == "Português":
             st.markdown(
@@ -122,8 +146,8 @@ if uploaded_aut_ref and uploaded_ref_ref:
         # Gráfico dos S21
         st.subheader("Visualização dos S21")
         fig1, ax1 = plt.subplots()
-        ax1.plot(df_aut_ref["Freq_MHz"], df_aut_ref["S21_dB"], label=legenda1, color='blue')
-        ax1.plot(df_ref_ref["Freq_MHz"], df_ref_ref["S21_dB"], label=legenda2, color='green')
+        ax1.plot(df_aut_ref["Freq_MHz"], df_aut_ref["Amplitude_dB"], label=legenda1, color='blue')
+        ax1.plot(df_ref_ref["Freq_MHz"], df_ref_ref["Amplitude_dB"], label=legenda2, color='green')
         ax1.axvline(fc_input, color='red', linestyle='--', label=linha_fc_label)
         ax1.set_xlabel(freq_label)
         ax1.set_ylabel(s21_label)
