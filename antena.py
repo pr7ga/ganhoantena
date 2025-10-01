@@ -30,34 +30,41 @@ with col4:
 # 🔹 Função unificada para CSV ou RESULT
 def carregar_dados(uploaded_file):
     nome_arquivo = uploaded_file.name.lower()
-    
-    if nome_arquivo.endswith(".csv"):
-        # Arquivo CSV do VNA
-        df = pd.read_csv(uploaded_file, skiprows=3, names=["Freq_Hz", "S21_dB", "Unused"])
-        df["Freq_Hz"] = df["Freq_Hz"].astype(str).str.replace('+', '', regex=False).str.strip()
-        df["S21_dB"] = df["S21_dB"].astype(str).str.replace('+', '', regex=False).str.strip()
-        df["Freq_Hz"] = df["Freq_Hz"].astype(float)
-        df["S21_dB"] = df["S21_dB"].astype(float)
-        df["Freq_MHz"] = df["Freq_Hz"] / 1e6
-        df = df[["Freq_MHz", "S21_dB"]]
-        df = df.rename(columns={"S21_dB": "Amplitude_dB"})
-    
-    elif nome_arquivo.endswith(".result"):
-        # Arquivo .result (7 colunas fixas)
-        df = pd.read_csv(
-            uploaded_file,
-            delim_whitespace=True,
-            header=None,
-            names=["Freq_Hz", "Unused", "Amplitude_dB", "Azim", "Pol", "Elev", "Timestamp"]
-        )
-        df = df[["Freq_Hz", "Amplitude_dB"]].copy()
-        df["Freq_MHz"] = df["Freq_Hz"] / 1e6
-        df = df[["Freq_MHz", "Amplitude_dB"]]
-    
-    else:
-        raise ValueError("Formato de arquivo não suportado. Use .csv ou .result")
-    
+
+    # Primeiro, tentamos abrir em UTF-8-SIG
+    try:
+        if nome_arquivo.endswith(".csv"):
+            df = pd.read_csv(uploaded_file, skiprows=3, names=["Freq_Hz", "S21_dB", "Unused"], encoding="utf-8-sig")
+            df["Freq_Hz"] = df["Freq_Hz"].astype(str).str.replace('+', '', regex=False).str.strip()
+            df["S21_dB"] = df["S21_dB"].astype(str).str.replace('+', '', regex=False).str.strip()
+            df["Freq_Hz"] = df["Freq_Hz"].astype(float)
+            df["S21_dB"] = df["S21_dB"].astype(float)
+            df["Freq_MHz"] = df["Freq_Hz"] / 1e6
+            df = df[["Freq_MHz", "S21_dB"]]
+            df = df.rename(columns={"S21_dB": "Amplitude_dB"})
+
+        elif nome_arquivo.endswith(".result"):
+            df = pd.read_csv(
+                uploaded_file,
+                delim_whitespace=True,
+                header=None,
+                encoding="utf-8-sig",
+                names=["Freq_Hz", "Unused", "Amplitude_dB", "Azim", "Pol", "Elev", "Timestamp"]
+            )
+            df = df[["Freq_Hz", "Amplitude_dB"]].copy()
+            df["Freq_MHz"] = df["Freq_Hz"] / 1e6
+            df = df[["Freq_MHz", "Amplitude_dB"]]
+        else:
+            raise ValueError("Formato de arquivo não suportado. Use .csv ou .result")
+
+    except UnicodeDecodeError:
+        # Tentativa fallback caso UTF-8-SIG falhe
+        uploaded_file.seek(0)  # resetar ponteiro
+        df = pd.read_csv(uploaded_file, delim_whitespace=True, header=None, encoding="latin1")
+        st.warning("⚠️ O arquivo não estava em UTF-8, mas foi lido em Latin1.")
+
     return df
+
 
 
 # Upload dos arquivos (aceita CSV e RESULT)
@@ -179,3 +186,4 @@ if uploaded_aut_ref and uploaded_ref_ref:
 
     except Exception as e:
         st.error(f"Ocorreu um erro ao processar os arquivos: {e}")
+
