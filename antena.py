@@ -259,4 +259,34 @@ if uploaded_aut_ref and uploaded_ref_ref:
         )
 
         # Gráfico dos S21
-        fig1, ax1
+        fig1, ax1 = plt.subplots()
+        ax1.plot(df_aut_ref["Freq_MHz"], df_aut_ref["Amplitude_dB"], label="S21 AUT/REF", color='blue')
+        ax1.plot(df_ref_ref["Freq_MHz"], df_ref_ref["Amplitude_dB"], label="S21 REF/REF", color='green')
+        ax1.axvline(fc_input, color='red', linestyle='--', label=f"Centro {fc_input} MHz")
+        ax1.set_xlabel("Frequência (MHz)")
+        ax1.set_ylabel("S21 (dB)")
+        ax1.legend(fontsize=9)
+        ax1.grid(True)
+        st.pyplot(fig1)
+
+        # Gráfico do ganho
+        fig2, ax2 = plt.subplots()
+        ax2.plot(freqs_common, gain_aut_freq, label=f"Ganho @ {fc_input:.1f} MHz", color='purple')
+        ax2.axvline(fc_input, color='red', linestyle='--')
+        ax2.set_xlabel("Frequência (MHz)")
+        ax2.set_ylabel("Ganho (dBi)")
+        ax2.legend(fontsize=9)
+        ax2.grid(True)
+        st.pyplot(fig2)
+
+        # Exportação dos dados
+        csv_output = df_gain.to_csv(index=False).encode("utf-8")
+        st.download_button(
+            label="⬇️ Baixar CSV com Ganho por Frequência",
+            data=csv_output,
+            file_name="ganho_antena_sob_teste.csv",
+            mime="text/csv"
+        )
+
+    except Exception as e:
+        st.error(f"Ocorreu um erro ao processar os arquivos: {e}")
