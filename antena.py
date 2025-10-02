@@ -233,22 +233,31 @@ if uploaded_aut_ref and uploaded_ref_ref:
             st.write("REF (primeiras 5 linhas)")
             st.dataframe(df_ref_ref.head())
 
-        # Interpolação para a mesma base de frequências
-        freqs_common = df_aut_ref["Freq_MHz"].values
+        # Frequência comum (interpolada)
+        freqs_common = np.linspace(
+            max(df_aut_ref["Freq_MHz"].min(), df_ref_ref["Freq_MHz"].min()),
+            min(df_aut_ref["Freq_MHz"].max(), df_ref_ref["Freq_MHz"].max()),
+            1000  # grade comum densa
+        )
         s21_aut_ref_interp = np.interp(freqs_common, df_aut_ref["Freq_MHz"], df_aut_ref["Amplitude_dB"])
         s21_ref_ref_interp = np.interp(freqs_common, df_ref_ref["Freq_MHz"], df_ref_ref["Amplitude_dB"])
-
+        
         # Cálculo do ganho da antena sob teste ao longo da faixa
         gain_aut_freq = gain_ref_input + (s21_aut_ref_interp - s21_ref_ref_interp)
         df_gain = pd.DataFrame({
             "Frequência (MHz)": freqs_common,
             "Ganho da Antena sob Teste (dBi)": gain_aut_freq
         })
+        
+        # Ganho interpolado na frequência central
+        if (fc_input >= freqs_common.min()) and (fc_input <= freqs_common.max()):
+            s21_aut_ref_fc = np.interp(fc_input, df_aut_ref["Freq_MHz"], df_aut_ref["Amplitude_dB"])
+            s21_ref_ref_fc = np.interp(fc_input, df_ref_ref["Freq_MHz"], df_ref_ref["Amplitude_dB"])
+            gain_aut_fc = gain_ref_input + (s21_aut_ref_fc - s21_ref_ref_fc)
+        else:
+            gain_aut_fc = None
+            st.warning("⚠️ Frequência central fora da faixa dos dados medidos.")
 
-        # Ganho na frequência central
-        s21_aut_ref_fc = np.interp(fc_input, df_aut_ref["Freq_MHz"], df_aut_ref["Amplitude_dB"])
-        s21_ref_ref_fc = np.interp(fc_input, df_ref_ref["Freq_MHz"], df_ref_ref["Amplitude_dB"])
-        gain_aut_fc = gain_ref_input + (s21_aut_ref_fc - s21_ref_ref_fc)
 
         st.markdown("<hr>", unsafe_allow_html=True)
 
@@ -290,3 +299,4 @@ if uploaded_aut_ref and uploaded_ref_ref:
 
     except Exception as e:
         st.error(f"Ocorreu um erro ao processar os arquivos: {e}")
+
